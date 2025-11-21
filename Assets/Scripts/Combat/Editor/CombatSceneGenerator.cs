@@ -13,6 +13,9 @@ namespace TurnBasedCombat.Editor
     /// </summary>
     public class CombatSceneGenerator : EditorWindow
     {
+        // Pretendard font for all TextMeshPro components
+        private TMP_FontAsset pretendardFont;
+
         [Header("BattlePreset Setup")]
         private BattlePreset battlePreset;
 
@@ -46,6 +49,16 @@ namespace TurnBasedCombat.Editor
         {
             var window = GetWindow<CombatSceneGenerator>("Combat Scene Generator");
             window.minSize = new Vector2(400, 600);
+        }
+
+        private void OnEnable()
+        {
+            // Load Pretendard font from Resources
+            pretendardFont = Resources.Load<TMP_FontAsset>("Fonts/public/static/Pretendard-Regular SDF");
+            if (pretendardFont == null)
+            {
+                Debug.LogWarning("Failed to load Pretendard font from Resources. Text will use default font.");
+            }
         }
 
         private void OnGUI()
@@ -401,6 +414,7 @@ namespace TurnBasedCombat.Editor
             text.alignment = TextAlignmentOptions.TopLeft;
             text.enableWordWrapping = true;
             text.color = Color.white;
+            if (pretendardFont != null) text.font = pretendardFont;
 
             obj.AddComponent<UI.CombatLog>();
             return obj;
@@ -466,6 +480,7 @@ namespace TurnBasedCombat.Editor
             tmp.fontSize = fontSize;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color = Color.white;
+            if (pretendardFont != null) tmp.font = pretendardFont;
         }
 
         private void CreateSlider(string name, Transform parent, Color fillColor, Vector2 pos, string label)
