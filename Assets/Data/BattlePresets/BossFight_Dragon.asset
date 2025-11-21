@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0}
+  m_Name: BossFight_Dragon
+  m_EditorClassIdentifier:
+  battleName: Boss Fight - Dragon
+  description: Epic boss battle against a powerful dragon
+  playerCharacters: []
+  enemyCharacters: []
+  turnDelay: 0.6
+  autoStartBattle: 1
+  playerFormation: 2
+  enemyFormation: 0
+  playerAreaCenter: {x: -4, y: 0, z: 0}
+  enemyAreaCenter: {x: 3, y: 0, z: 0}
+  formationSpacing: 1.5
+  generateUI: 1
+  enableDamageNumbers: 1
+  enableCameraShake: 1
+  backgroundColor: {r: 0.15, g: 0.05, b: 0.1, a: 1}
+  create2DLighting: 1

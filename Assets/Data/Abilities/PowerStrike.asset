@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0}
+  m_Name: PowerStrike
+  m_EditorClassIdentifier:
+  abilityName: Power Strike
+  description: A powerful physical attack
+  icon: {fileID: 0}
+  mpCost: 8
+  cooldown: 0
+  targetType: 2
+  effectType: 0
+  basePower: 20
+  powerMultiplier: 2.0
+  appliesStatusEffect: 0
+  statusEffectType: 0
+  statusEffectDuration: 0
+  statusEffectPower: 0
+  statusEffectChance: 0
+  effectPrefab: {fileID: 0}
+  effectColor: {r: 1, g: 1, b: 0, a: 1}
