@@ -42,7 +42,21 @@ namespace TurnBasedCombat.Editor
         private Vector3 enemyPosition = new Vector3(4, -1, 0);
         private Color enemyColor = Color.red;
 
-        private Color backgroundColor = new Color(0.2f, 0.2f, 0.3f);
+        private Color backgroundColor = new Color(0.1f, 0.1f, 0.15f); // Darker background
+
+        // Design Palette
+        private static class Palette
+        {
+            public static Color Primary = new Color(0.2f, 0.6f, 1.0f); // Vibrant Blue
+            public static Color Secondary = new Color(0.8f, 0.3f, 0.3f); // Vibrant Red
+            public static Color Accent = new Color(1.0f, 0.8f, 0.2f); // Gold
+            public static Color DarkPanel = new Color(0.08f, 0.08f, 0.12f, 0.95f); // Very Dark Blue/Black
+            public static Color LightPanel = new Color(0.15f, 0.15f, 0.22f, 0.9f); // Lighter Dark Blue
+            public static Color TextPrimary = new Color(0.95f, 0.95f, 0.95f);
+            public static Color TextSecondary = new Color(0.7f, 0.7f, 0.8f);
+            public static Color Health = new Color(0.2f, 0.8f, 0.4f);
+            public static Color Mana = new Color(0.2f, 0.6f, 0.9f);
+        }
 
         [MenuItem("Tools/Combat/Generate Combat Scene")]
         public static void ShowWindow()
@@ -338,26 +352,44 @@ namespace TurnBasedCombat.Editor
             obj.transform.SetParent(parent, false);
 
             var rect = obj.AddComponent<RectTransform>();
-            rect.sizeDelta = new Vector2(300, 120);
+            rect.sizeDelta = new Vector2(350, 140); // Slightly larger card
 
+            // Positioning
             if (isPlayer)
             {
                 rect.anchorMin = rect.anchorMax = new Vector2(0, 0);
                 rect.pivot = new Vector2(0, 0);
-                rect.anchoredPosition = new Vector2(10, 10);
+                rect.anchoredPosition = new Vector2(40, 40);
             }
             else
             {
                 rect.anchorMin = rect.anchorMax = new Vector2(1, 1);
                 rect.pivot = new Vector2(1, 1);
-                rect.anchoredPosition = new Vector2(-10, -10);
+                rect.anchoredPosition = new Vector2(-40, -40);
             }
 
-            obj.AddComponent<Image>().color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            // Background Panel (Card style)
+            var img = obj.AddComponent<Image>();
+            img.color = Palette.LightPanel;
+            
+            // Add outline/border
+            var outline = obj.AddComponent<Outline>();
+            outline.effectColor = isPlayer ? Palette.Primary : Palette.Secondary;
+            outline.effectDistance = new Vector2(2, -2);
 
-            CreateText("Name", obj.transform, character.CharacterName, 20, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -10), new Vector2(-20, 30));
-            CreateSlider("HP", obj.transform, Color.green, new Vector2(0, -45), $"{character.Stats.CurrentHP}/{character.Stats.MaxHP}");
-            CreateSlider("MP", obj.transform, Color.blue, new Vector2(0, -75), $"{character.Stats.CurrentMP}/{character.Stats.MaxMP}");
+            // Character Name
+            CreateText("Name", obj.transform, character.CharacterName, 24, 
+                new Vector2(0, 1), new Vector2(1, 1), 
+                new Vector2(20, -25), new Vector2(-40, 40), 
+                TextAlignmentOptions.Left, Palette.TextPrimary, true);
+
+            // HP Bar
+            CreateBar("HP", obj.transform, Palette.Health, new Vector2(0, -60), 
+                $"{character.Stats.CurrentHP}/{character.Stats.MaxHP}", "HP");
+
+            // MP Bar
+            CreateBar("MP", obj.transform, Palette.Mana, new Vector2(0, -95), 
+                $"{character.Stats.CurrentMP}/{character.Stats.MaxMP}", "MP");
 
             var hud = obj.AddComponent<UI.CombatHUD>();
             hud.SetCharacter(character);
@@ -373,47 +405,77 @@ namespace TurnBasedCombat.Editor
             rect.anchorMin = new Vector2(1, 0);
             rect.anchorMax = new Vector2(1, 1);
             rect.pivot = new Vector2(1, 0.5f);
-            rect.anchoredPosition = new Vector2(-20, 0);
-            rect.sizeDelta = new Vector2(400, -140);
+            rect.anchoredPosition = new Vector2(-40, 0); // Spacing from right edge
+            rect.sizeDelta = new Vector2(400, -200); // Full height minus padding
 
-            obj.AddComponent<Image>().color = new Color(0, 0, 0, 0.8f);
+            // Background
+            var img = obj.AddComponent<Image>();
+            img.color = Palette.DarkPanel;
 
-            CreateText("Title", obj.transform, "전투 로그", 18, new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -5), new Vector2(-10, 30));
+            // Header
+            CreateText("Title", obj.transform, "BATTLE LOG", 16, 
+                new Vector2(0, 1), new Vector2(1, 1), 
+                new Vector2(0, -20), new Vector2(0, 40), 
+                TextAlignmentOptions.Center, Palette.Accent, true);
 
+            // Scroll View
             var scrollObj = new GameObject("ScrollView");
             scrollObj.transform.SetParent(obj.transform, false);
             var scrollRect = scrollObj.AddComponent<RectTransform>();
             scrollRect.anchorMin = new Vector2(0, 0);
             scrollRect.anchorMax = new Vector2(1, 1);
-            scrollRect.anchoredPosition = new Vector2(0, -20);
-            scrollRect.sizeDelta = new Vector2(-10, -50);
+            scrollRect.anchoredPosition = new Vector2(0, -40); // Below title
+            scrollRect.sizeDelta = new Vector2(-20, -50); // Padding
 
             var scroll = scrollObj.AddComponent<ScrollRect>();
             scroll.vertical = true;
             scroll.horizontal = false;
 
+            // Viewport (Mask)
+            var viewport = new GameObject("Viewport");
+            viewport.transform.SetParent(scrollObj.transform, false);
+            var viewRect = viewport.AddComponent<RectTransform>();
+            viewRect.anchorMin = Vector2.zero;
+            viewRect.anchorMax = Vector2.one;
+            viewRect.sizeDelta = Vector2.zero;
+            viewport.AddComponent<RectMask2D>();
+            scroll.viewport = viewRect;
+
+            // Content
             var content = new GameObject("Content");
-            content.transform.SetParent(scrollObj.transform, false);
+            content.transform.SetParent(viewport.transform, false);
             var contentRect = content.AddComponent<RectTransform>();
             contentRect.anchorMin = new Vector2(0, 1);
             contentRect.anchorMax = new Vector2(1, 1);
             contentRect.pivot = new Vector2(0.5f, 1);
-            contentRect.sizeDelta = new Vector2(0, 1000);
+            contentRect.sizeDelta = new Vector2(0, 0); // Height will be controlled by ContentSizeFitter
+            
+            var csf = content.AddComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            
+            var vlg = content.AddComponent<VerticalLayoutGroup>();
+            vlg.childControlHeight = true;
+            vlg.childForceExpandHeight = false;
+            vlg.spacing = 5;
+            vlg.padding = new RectOffset(10, 10, 10, 10);
+
             scroll.content = contentRect;
 
+            // Text Component (The log script usually expects a single text component or a container)
+            // The existing CombatLog.cs expects a TextMeshProUGUI named "LogText" or child.
+            // Let's stick to the existing pattern but make it look better.
+            // Actually, the existing CombatLog.cs appends text to a single TMP component.
+            
             var textObj = new GameObject("LogText");
             textObj.transform.SetParent(content.transform, false);
             var textRect = textObj.AddComponent<RectTransform>();
-            textRect.anchorMin = new Vector2(0, 1);
-            textRect.anchorMax = new Vector2(1, 1);
-            textRect.pivot = new Vector2(0, 1);
-            textRect.sizeDelta = new Vector2(-10, 1000);
-
+            // Layout group controls this, but we need initial setup
+            
             var text = textObj.AddComponent<TextMeshProUGUI>();
             text.fontSize = 14;
             text.alignment = TextAlignmentOptions.TopLeft;
             text.enableWordWrapping = true;
-            text.color = Color.white;
+            text.color = Palette.TextSecondary;
             if (pretendardFont != null) text.font = pretendardFont;
 
             obj.AddComponent<UI.CombatLog>();
@@ -426,12 +488,25 @@ namespace TurnBasedCombat.Editor
             obj.transform.SetParent(parent, false);
 
             var rect = obj.AddComponent<RectTransform>();
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0);
+            rect.anchorMin = new Vector2(0.5f, 0);
+            rect.anchorMax = new Vector2(0.5f, 0);
             rect.pivot = new Vector2(0.5f, 0);
-            rect.anchoredPosition = new Vector2(0, 20);
-            rect.sizeDelta = new Vector2(600, 100);
+            rect.anchoredPosition = new Vector2(0, 0);
+            rect.sizeDelta = new Vector2(800, 120); // Wide bottom bar
 
-            obj.AddComponent<Image>().color = new Color(0.2f, 0.2f, 0.2f, 0.9f);
+            // Background
+            var img = obj.AddComponent<Image>();
+            img.color = Palette.DarkPanel;
+
+            // Top Border
+            var borderObj = new GameObject("TopBorder");
+            borderObj.transform.SetParent(obj.transform, false);
+            var borderRect = borderObj.AddComponent<RectTransform>();
+            borderRect.anchorMin = new Vector2(0, 1);
+            borderRect.anchorMax = new Vector2(1, 1);
+            borderRect.sizeDelta = new Vector2(0, 2);
+            borderRect.anchoredPosition = new Vector2(0, 0);
+            borderObj.AddComponent<Image>().color = Palette.Accent;
 
             var panel = new GameObject("Main Menu Panel");
             var panelRect = panel.AddComponent<RectTransform>();
@@ -440,12 +515,20 @@ namespace TurnBasedCombat.Editor
             panelRect.anchorMax = Vector2.one;
             panelRect.sizeDelta = Vector2.zero;
 
+            // Layout for buttons
+            var hlg = panel.AddComponent<HorizontalLayoutGroup>();
+            hlg.childControlWidth = false;
+            hlg.childControlHeight = false;
+            hlg.spacing = 20;
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+
             var menu = obj.AddComponent<UI.ActionMenu>();
 
-            var attackBtn = CreateButton(panelRect, "공격", new Vector2(-220, 0), new Color(0.8f, 0.2f, 0.2f));
-            var skillBtn = CreateButton(panelRect, "스킬", new Vector2(-80, 0), new Color(0.2f, 0.4f, 0.8f));
-            var itemBtn = CreateButton(panelRect, "아이템", new Vector2(60, 0), new Color(0.2f, 0.7f, 0.2f));
-            var defendBtn = CreateButton(panelRect, "방어", new Vector2(200, 0), new Color(0.8f, 0.7f, 0.2f));
+            // Create styled buttons
+            var attackBtn = CreateButton(panelRect, "ATTACK", Palette.Secondary);
+            var skillBtn = CreateButton(panelRect, "SKILL", Palette.Primary);
+            var itemBtn = CreateButton(panelRect, "ITEM", Palette.Health);
+            var defendBtn = CreateButton(panelRect, "DEFEND", Palette.Accent);
 
             var type = typeof(UI.ActionMenu);
             var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
@@ -464,7 +547,8 @@ namespace TurnBasedCombat.Editor
         #region Helpers
 
         private void CreateText(string name, Transform parent, string text, int fontSize,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size)
+            Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size, 
+            TextAlignmentOptions alignment, Color color, bool bold = false)
         {
             var obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
@@ -478,35 +562,39 @@ namespace TurnBasedCombat.Editor
             var tmp = obj.AddComponent<TextMeshProUGUI>();
             tmp.text = text;
             tmp.fontSize = fontSize;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = Color.white;
+            tmp.alignment = alignment;
+            tmp.color = color;
+            if (bold) tmp.fontStyle = FontStyles.Bold;
             if (pretendardFont != null) tmp.font = pretendardFont;
         }
 
-        private void CreateSlider(string name, Transform parent, Color fillColor, Vector2 pos, string label)
+        private void CreateBar(string name, Transform parent, Color fillColor, Vector2 pos, string label, string prefix)
         {
-            var obj = new GameObject(name + "Slider");
+            var obj = new GameObject(name + "Bar");
             obj.transform.SetParent(parent, false);
             var rect = obj.AddComponent<RectTransform>();
             rect.anchorMin = new Vector2(0, 1);
             rect.anchorMax = new Vector2(1, 1);
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = pos;
-            rect.sizeDelta = new Vector2(-20, 20);
+            rect.sizeDelta = new Vector2(-40, 20); // Padding from sides
 
             var slider = obj.AddComponent<Slider>();
             slider.minValue = 0;
             slider.maxValue = 100;
             slider.value = 100;
 
+            // Background
             var bg = new GameObject("Background");
             bg.transform.SetParent(obj.transform, false);
             var bgRect = bg.AddComponent<RectTransform>();
             bgRect.anchorMin = Vector2.zero;
             bgRect.anchorMax = Vector2.one;
             bgRect.sizeDelta = Vector2.zero;
-            bg.AddComponent<Image>().color = new Color(0.2f, 0.2f, 0.2f);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = new Color(0.1f, 0.1f, 0.1f, 0.5f);
 
+            // Fill Area
             var fillArea = new GameObject("Fill Area");
             fillArea.transform.SetParent(obj.transform, false);
             var fillAreaRect = fillArea.AddComponent<RectTransform>();
@@ -514,6 +602,7 @@ namespace TurnBasedCombat.Editor
             fillAreaRect.anchorMax = Vector2.one;
             fillAreaRect.sizeDelta = Vector2.zero;
 
+            // Fill
             var fill = new GameObject("Fill");
             fill.transform.SetParent(fillArea.transform, false);
             var fillRect = fill.AddComponent<RectTransform>();
@@ -526,18 +615,25 @@ namespace TurnBasedCombat.Editor
             slider.fillRect = fillRect;
             slider.targetGraphic = fillImg;
 
-            CreateText("Text", obj.transform, label, 14, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // Label (Left)
+            CreateText("Label", obj.transform, prefix, 12, 
+                new Vector2(0, 0.5f), new Vector2(0, 0.5f), 
+                new Vector2(-15, 0), new Vector2(30, 20), 
+                TextAlignmentOptions.Right, Palette.TextSecondary, true);
+
+            // Value Text (Center/Overlay)
+            CreateText("Value", obj.transform, label, 12, 
+                Vector2.zero, Vector2.one, 
+                Vector2.zero, Vector2.zero, 
+                TextAlignmentOptions.Center, Color.white, true);
         }
 
-        private Button CreateButton(RectTransform parent, string text, Vector2 pos, Color color)
+        private Button CreateButton(RectTransform parent, string text, Color color)
         {
             var obj = new GameObject(text + " Button");
             var rect = obj.AddComponent<RectTransform>();
             rect.SetParent(parent, false);
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = pos;
-            rect.sizeDelta = new Vector2(120, 60);
+            rect.sizeDelta = new Vector2(160, 60);
 
             var img = obj.AddComponent<Image>();
             img.color = color;
@@ -549,7 +645,18 @@ namespace TurnBasedCombat.Editor
             colors.pressedColor = color * 0.8f;
             btn.colors = colors;
 
-            CreateText("Text", rect, text, 20, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            // Button Text
+            CreateText("Text", rect, text, 18, 
+                Vector2.zero, Vector2.one, 
+                Vector2.zero, Vector2.zero, 
+                TextAlignmentOptions.Center, Color.white, true);
+            
+            // Add subtle shadow/outline to button text for readability
+            var textObj = rect.Find("Text").gameObject;
+            var outline = textObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0, 0, 0, 0.5f);
+            outline.effectDistance = new Vector2(1, -1);
+
             return btn;
         }
 
