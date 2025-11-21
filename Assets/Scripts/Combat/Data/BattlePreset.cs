@@ -15,10 +15,10 @@ namespace TurnBasedCombat.Data
         [SerializeField] private string description = "Battle description";
 
         [Header("Player Characters")]
-        [SerializeField] private List<CharacterEntry> playerCharacters = new List<CharacterEntry>();
+        [SerializeField] private List<CharacterTemplate> playerCharacters = new List<CharacterTemplate>();
 
         [Header("Enemy Characters")]
-        [SerializeField] private List<CharacterEntry> enemyCharacters = new List<CharacterEntry>();
+        [SerializeField] private List<CharacterTemplate> enemyCharacters = new List<CharacterTemplate>();
 
         [Header("Battle Settings")]
         [SerializeField] private float turnDelay = 0.5f;
@@ -43,8 +43,8 @@ namespace TurnBasedCombat.Data
         // Properties
         public string BattleName => battleName;
         public string Description => description;
-        public List<CharacterEntry> PlayerCharacters => playerCharacters;
-        public List<CharacterEntry> EnemyCharacters => enemyCharacters;
+        public List<CharacterTemplate> PlayerCharacters => playerCharacters;
+        public List<CharacterTemplate> EnemyCharacters => enemyCharacters;
         public float TurnDelay => turnDelay;
         public bool AutoStartBattle => autoStartBattle;
         public FormationType PlayerFormation => playerFormation;
@@ -131,47 +131,6 @@ namespace TurnBasedCombat.Data
         public bool IsValid()
         {
             return playerCharacters.Count > 0 && enemyCharacters.Count > 0;
-        }
-    }
-
-    /// <summary>
-    /// Entry for a character in a battle preset
-    /// </summary>
-    [System.Serializable]
-    public class CharacterEntry
-    {
-        [SerializeField] private CharacterTemplate template;
-        [SerializeField] private string customName = "";
-        [SerializeField] private bool overrideStats = false;
-
-        [Header("Stat Overrides")]
-        [SerializeField] private int hpOverride = 100;
-        [SerializeField] private int mpOverride = 50;
-        [SerializeField] private int attackOverride = 15;
-        [SerializeField] private int defenseOverride = 8;
-        [SerializeField] private int speedOverride = 12;
-
-        public CharacterTemplate Template => template;
-        public string CustomName => string.IsNullOrEmpty(customName) ? template?.CharacterName : customName;
-        public bool OverrideStats => overrideStats;
-
-        public CharacterStatsData GetStats()
-        {
-            if (overrideStats)
-            {
-                return new CharacterStatsData
-                {
-                    maxHP = hpOverride,
-                    maxMP = mpOverride,
-                    attack = attackOverride,
-                    defense = defenseOverride,
-                    speed = speedOverride
-                };
-            }
-            else
-            {
-                return template?.GetStatsData() ?? new CharacterStatsData();
-            }
         }
     }
 

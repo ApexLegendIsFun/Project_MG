@@ -9,15 +9,12 @@ using TurnBasedCombat.Data;
 namespace TurnBasedCombat.Editor
 {
     /// <summary>
-    /// Editor window for generating simple combat scenes without presets
+    /// Editor window for generating combat scenes from BattlePresets or manual setup
     /// </summary>
-    public class SimpleCombatSceneGenerator : EditorWindow
+    public class CombatSceneGenerator : EditorWindow
     {
-        [Header("ScriptableObject Setup")]
-        private SimpleCombatPreset combatPreset;
-        private CombatSetupData playerSetupData;
-        private CombatSetupData enemySetupData;
-        private SceneSetupData sceneSetupData;
+        [Header("BattlePreset Setup")]
+        private BattlePreset battlePreset;
 
         [Header("Manual Override")]
         private bool useManualSetup = true;
@@ -44,29 +41,29 @@ namespace TurnBasedCombat.Editor
 
         private Color backgroundColor = new Color(0.2f, 0.2f, 0.3f);
 
-        [MenuItem("Tools/Combat/Generate Simple Scene")]
+        [MenuItem("Tools/Combat/Generate Combat Scene")]
         public static void ShowWindow()
         {
-            var window = GetWindow<SimpleCombatSceneGenerator>("Combat Scene Generator");
+            var window = GetWindow<CombatSceneGenerator>("Combat Scene Generator");
             window.minSize = new Vector2(400, 600);
         }
 
         private void OnGUI()
         {
-            EditorGUILayout.LabelField("Simple Combat Scene Generator", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox("Generate a simple 1v1 combat scene with ScriptableObjects or manual setup", MessageType.Info);
+            EditorGUILayout.LabelField("Combat Scene Generator", EditorStyles.boldLabel);
+            EditorGUILayout.HelpBox("Generate combat scenes from BattlePresets or manual setup", MessageType.Info);
             EditorGUILayout.Space(10);
 
-            // ===== Preset Loading Section =====
-            EditorGUILayout.LabelField("Load from Complete Preset", EditorStyles.boldLabel);
+            // ===== BattlePreset Loading Section =====
+            EditorGUILayout.LabelField("Load from BattlePreset", EditorStyles.boldLabel);
             
-            SimpleCombatPreset newPreset = (SimpleCombatPreset)EditorGUILayout.ObjectField(
-                "Combat Preset", combatPreset, typeof(SimpleCombatPreset), false);
+            BattlePreset newPreset = (BattlePreset)EditorGUILayout.ObjectField(
+                "Battle Preset", battlePreset, typeof(BattlePreset), false);
             
-            if (newPreset != combatPreset)
+            if (newPreset != battlePreset)
             {
-                combatPreset = newPreset;
-                if (combatPreset != null)
+                battlePreset = newPreset;
+                if (battlePreset != null)
                 {
                     LoadFromPreset();
                     useManualSetup = false;
@@ -74,66 +71,26 @@ namespace TurnBasedCombat.Editor
             }
 
             // Show preset validation status
-            if (combatPreset != null)
+            if (battlePreset != null)
             {
-                if (combatPreset.IsValid())
+                if (battlePreset.IsValid())
                 {
-                    EditorGUILayout.HelpBox("✓ Preset is valid and loaded", MessageType.Info);
+                    EditorGUILayout.HelpBox($"✓ Preset loaded: {battlePreset.BattleName}\nPlayers: {battlePreset.PlayerCharacters.Count}, Enemies: {battlePreset.EnemyCharacters.Count}", MessageType.Info);
                 }
                 else
                 {
-                    EditorGUILayout.HelpBox(combatPreset.GetValidationMessage(), MessageType.Warning);
-                }
-            }
-
-            EditorGUILayout.Space(10);
-
-            // ===== Individual Setup Data Loading =====
-            EditorGUILayout.LabelField("Or Load Individual Setups", EditorStyles.boldLabel);
-            
-            CombatSetupData newPlayerSetup = (CombatSetupData)EditorGUILayout.ObjectField(
-                "Player Setup", playerSetupData, typeof(CombatSetupData), false);
-            if (newPlayerSetup != playerSetupData)
-            {
-                playerSetupData = newPlayerSetup;
-                if (playerSetupData != null)
-                {
-                    LoadPlayerSetup();
-                    useManualSetup = false;
-                }
-            }
-            
-            CombatSetupData newEnemySetup = (CombatSetupData)EditorGUILayout.ObjectField(
-                "Enemy Setup", enemySetupData, typeof(CombatSetupData), false);
-            if (newEnemySetup != enemySetupData)
-            {
-                enemySetupData = newEnemySetup;
-                if (enemySetupData != null)
-                {
-                    LoadEnemySetup();
-                    useManualSetup = false;
-                }
-            }
-            
-            SceneSetupData newSceneSetup = (SceneSetupData)EditorGUILayout.ObjectField(
-                "Scene Setup", sceneSetupData, typeof(SceneSetupData), false);
-            if (newSceneSetup != sceneSetupData)
-            {
-                sceneSetupData = newSceneSetup;
-                if (sceneSetupData != null)
-                {
-                    LoadSceneSetup();
+                    EditorGUILayout.HelpBox("⚠ Preset is invalid - needs at least 1 player and 1 enemy", MessageType.Warning);
                 }
             }
 
             EditorGUILayout.Space(10);
 
             // ===== Manual Override Toggle =====
-            bool newUseManual = EditorGUILayout.Toggle("Manual Override", useManualSetup);
+            bool newUseManual = EditorGUILayout.Toggle("Manual Override (1v1 only)", useManualSetup);
             if (newUseManual != useManualSetup)
             {
                 useManualSetup = newUseManual;
-                if (!useManualSetup && combatPreset != null)
+                if (!useManualSetup && battlePreset != null)
                 {
                     LoadFromPreset();
                 }
@@ -141,7 +98,7 @@ namespace TurnBasedCombat.Editor
 
             if (useManualSetup)
             {
-                EditorGUILayout.HelpBox("Manual mode: Edit values directly below", MessageType.Info);
+                EditorGUILayout.HelpBox("Manual mode: Quick 1v1 setup - Edit values directly below", MessageType.Info);
                 EditorGUILayout.Space(5);
 
                 // ===== Player Setup =====
@@ -176,7 +133,7 @@ namespace TurnBasedCombat.Editor
             }
             else
             {
-                EditorGUILayout.HelpBox("Using ScriptableObject data - toggle Manual Override to edit values", MessageType.Info);
+                EditorGUILayout.HelpBox("Using BattlePreset data - toggle Manual Override to edit values", MessageType.Info);
             }
 
             EditorGUILayout.Space(20);
@@ -187,6 +144,65 @@ namespace TurnBasedCombat.Editor
                 GenerateScene();
             }
         }
+
+        #region BattlePreset Loading Methods
+
+        /// <summary>
+        /// Load data from BattlePreset for 1v1 preview (first player vs first enemy)
+        /// </summary>
+        private void LoadFromPreset()
+        {
+            if (battlePreset == null || !battlePreset.IsValid())
+            {
+                Debug.LogWarning("Cannot load from preset: Preset is null or invalid");
+                return;
+            }
+
+            // Load first player
+            if (battlePreset.PlayerCharacters.Count > 0)
+            {
+                var playerTemplate = battlePreset.PlayerCharacters[0];
+                if (playerTemplate != null)
+                {
+                    playerName = playerTemplate.CharacterName;
+                    playerHP = playerTemplate.MaxHP;
+                    playerMP = playerTemplate.MaxMP;
+                    playerAtk = playerTemplate.Attack;
+                    playerDef = playerTemplate.Defense;
+                    playerSpd = playerTemplate.Speed;
+                    playerColor = playerTemplate.SpriteColor;
+                    
+                    // Use formation position
+                    playerPosition = battlePreset.GetCharacterPosition(true, 0, battlePreset.PlayerCharacters.Count);
+                }
+            }
+
+            // Load first enemy
+            if (battlePreset.EnemyCharacters.Count > 0)
+            {
+                var enemyTemplate = battlePreset.EnemyCharacters[0];
+                if (enemyTemplate != null)
+                {
+                    enemyName = enemyTemplate.CharacterName;
+                    enemyHP = enemyTemplate.MaxHP;
+                    enemyMP = enemyTemplate.MaxMP;
+                    enemyAtk = enemyTemplate.Attack;
+                    enemyDef = enemyTemplate.Defense;
+                    enemySpd = enemyTemplate.Speed;
+                    enemyColor = enemyTemplate.SpriteColor;
+                    
+                    // Use formation position
+                    enemyPosition = battlePreset.GetCharacterPosition(false, 0, battlePreset.EnemyCharacters.Count);
+                }
+            }
+
+            // Load scene settings
+            backgroundColor = battlePreset.BackgroundColor;
+
+            Debug.Log($"Loaded preset: {battlePreset.BattleName} (showing first player vs first enemy)");
+        }
+
+        #endregion
 
         private void GenerateScene()
         {
@@ -220,95 +236,6 @@ namespace TurnBasedCombat.Editor
             Debug.Log("=== Combat Scene Generated! ===");
             EditorUtility.DisplayDialog("Success", "Combat scene generated successfully!", "OK");
         }
-
-        #region ScriptableObject Loading Methods
-
-        /// <summary>
-        /// Load all data from a complete combat preset
-        /// </summary>
-        private void LoadFromPreset()
-        {
-            if (combatPreset == null || !combatPreset.IsValid())
-            {
-                Debug.LogWarning("Cannot load from preset: Preset is null or invalid");
-                return;
-            }
-
-            playerSetupData = combatPreset.PlayerSetup;
-            enemySetupData = combatPreset.EnemySetup;
-            sceneSetupData = combatPreset.SceneSetup;
-
-            LoadPlayerSetup();
-            LoadEnemySetup();
-            LoadSceneSetup();
-
-            Debug.Log($"Loaded complete preset: {combatPreset.PresetName}");
-        }
-
-        /// <summary>
-        /// Load player setup data from ScriptableObject
-        /// </summary>
-        private void LoadPlayerSetup()
-        {
-            if (playerSetupData == null)
-            {
-                Debug.LogWarning("Player Setup Data is null");
-                return;
-            }
-
-            playerName = playerSetupData.CharacterName;
-            playerHP = playerSetupData.MaxHP;
-            playerMP = playerSetupData.MaxMP;
-            playerAtk = playerSetupData.Attack;
-            playerDef = playerSetupData.Defense;
-            playerSpd = playerSetupData.Speed;
-            playerPosition = playerSetupData.Position;
-            playerColor = playerSetupData.SpriteColor;
-
-            Debug.Log($"Loaded player setup: {playerName}");
-        }
-
-        /// <summary>
-        /// Load enemy setup data from ScriptableObject
-        /// </summary>
-        private void LoadEnemySetup()
-        {
-            if (enemySetupData == null)
-            {
-                Debug.LogWarning("Enemy Setup Data is null");
-                return;
-            }
-
-            enemyName = enemySetupData.CharacterName;
-            enemyHP = enemySetupData.MaxHP;
-            enemyMP = enemySetupData.MaxMP;
-            enemyAtk = enemySetupData.Attack;
-            enemyDef = enemySetupData.Defense;
-            enemySpd = enemySetupData.Speed;
-            enemyPosition = enemySetupData.Position;
-            enemyColor = enemySetupData.SpriteColor;
-
-            Debug.Log($"Loaded enemy setup: {enemyName}");
-        }
-
-        /// <summary>
-        /// Load scene setup data from ScriptableObject
-        /// </summary>
-        private void LoadSceneSetup()
-        {
-            if (sceneSetupData == null)
-            {
-                Debug.LogWarning("Scene Setup Data is null");
-                return;
-            }
-
-            backgroundColor = sceneSetupData.BackgroundColor;
-            // Additional scene settings can be applied here when GenerateScene is called
-
-            Debug.Log("Loaded scene setup");
-        }
-
-        #endregion
 
         #region Scene Setup
 

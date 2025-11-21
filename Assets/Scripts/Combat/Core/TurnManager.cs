@@ -7,7 +7,7 @@ using UnityEngine.Events;
 namespace TurnBasedCombat.Core
 {
     /// <summary>
-    /// Manages turn order and combat flow
+    /// Manages turn order and combat flow using a state machine
     /// </summary>
     public class TurnManager : MonoBehaviour
     {
@@ -17,6 +17,7 @@ namespace TurnBasedCombat.Core
 
         [Header("Settings")]
         [SerializeField] private float turnDelay = 0.5f;
+        [SerializeField] private float enemyThinkTime = 1f;
 
         // Events
         public UnityEvent<CombatState> OnStateChanged;
@@ -30,6 +31,11 @@ namespace TurnBasedCombat.Core
         private List<CombatCharacter> turnOrder = new List<CombatCharacter>();
         private int currentTurnIndex = 0;
         private CombatCharacter currentCharacter;
+        
+        // Timers
+        private float stateTimer = 0f;
+        private bool waitingForAction = false;
+        private Coroutine currentActionCoroutine = null;
 
         public CombatState CurrentState => currentState;
         public CombatCharacter CurrentCharacter => currentCharacter;
@@ -50,114 +56,142 @@ namespace TurnBasedCombat.Core
         /// </summary>
         public void StartBattle()
         {
-            ChangeState(CombatState.BattleStart);
-
+            Debug.Log("[TurnManager] Starting battle");
+            
             // Calculate turn order based on speed
             CalculateTurnOrder();
 
+            ChangeState(CombatState.BattleStart);
             OnBattleStart?.Invoke();
-
-            StartCoroutine(BattleLoop());
+            
+            stateTimer = turnDelay;
         }
 
         /// <summary>
-        /// Main battle loop
+        /// State machine update - processes current state each frame
         /// </summary>
-        private IEnumerator BattleLoop()
+        private void Update()
         {
-            yield return new WaitForSeconds(turnDelay);
+            // Don't process if not in an active battle state
+            if (currentState == CombatState.Idle)
+                return;
 
-            while (currentState != CombatState.Victory &&
-                   currentState != CombatState.Defeat &&
-                   currentState != CombatState.Flee)
+            // Update timer
+            if (stateTimer > 0)
             {
-                // Get next character in turn order
-                currentCharacter = GetNextCharacter();
+                stateTimer -= Time.deltaTime;
+                return;
+            }
 
-                if (currentCharacter == null || !currentCharacter.IsAlive)
-                {
-                    NextTurn();
-                    continue;
-                }
-
-                // Start turn
-                OnTurnStart?.Invoke(currentCharacter);
-
-                // Determine if player or enemy turn
-                if (playerCharacters.Contains(currentCharacter))
-                {
-                    ChangeState(CombatState.PlayerTurn);
-                    yield return StartCoroutine(PlayerTurnRoutine());
-                }
-                else
-                {
-                    ChangeState(CombatState.EnemyTurn);
-                    yield return StartCoroutine(EnemyTurnRoutine());
-                }
-
-                OnTurnEnd?.Invoke(currentCharacter);
-
-                // Process effects and check win conditions
-                ChangeState(CombatState.Processing);
-                yield return StartCoroutine(ProcessEffects());
-
-                // Check win/lose conditions
-                if (CheckVictory())
-                {
-                    ChangeState(CombatState.Victory);
-                    OnBattleEnd?.Invoke();
+            // Process current state
+            switch (currentState)
+            {
+                case CombatState.BattleStart:
+                    ProcessBattleStart();
                     break;
-                }
-                else if (CheckDefeat())
-                {
-                    ChangeState(CombatState.Defeat);
-                    OnBattleEnd?.Invoke();
-                    break;
-                }
 
-                yield return new WaitForSeconds(turnDelay);
+                case CombatState.PlayerTurn:
+                    ProcessPlayerTurn();
+                    break;
+
+                case CombatState.PlayerAction:
+                    ProcessPlayerAction();
+                    break;
+
+                case CombatState.EnemyTurn:
+                    ProcessEnemyTurn();
+                    break;
+
+                case CombatState.EnemyAction:
+                    ProcessEnemyAction();
+                    break;
+
+                case CombatState.Processing:
+                    ProcessEffectsState();
+                    break;
+
+                case CombatState.Victory:
+                case CombatState.Defeat:
+                    // Battle ended, do nothing
+                    break;
             }
         }
 
         /// <summary>
-        /// Player's turn routine - waits for player input
+        /// Process BattleStart state - move to first turn
         /// </summary>
-        private IEnumerator PlayerTurnRoutine()
+        private void ProcessBattleStart()
         {
-            // Wait for player to select an action
-            // This will be triggered by UI buttons
-            while (currentState == CombatState.PlayerTurn)
+            Debug.Log("[TurnManager] Processing BattleStart");
+            StartNextTurn();
+        }
+
+        /// <summary>
+        /// Process PlayerTurn state - wait for player input
+        /// </summary>
+        private void ProcessPlayerTurn()
+        {
+            // Just wait - player input will call ExecutePlayerAction
+            // which will change the state
+        }
+
+        /// <summary>
+        /// Process PlayerAction state - wait for action to complete
+        /// </summary>
+        private void ProcessPlayerAction()
+        {
+            // Wait for action coroutine to complete
+            if (!waitingForAction)
             {
-                yield return null;
+                EndCurrentTurn();
             }
         }
 
         /// <summary>
-        /// Enemy's turn routine - AI decision making
+        /// Process EnemyTurn state - AI decides action
         /// </summary>
-        private IEnumerator EnemyTurnRoutine()
+        private void ProcessEnemyTurn()
         {
-            yield return new WaitForSeconds(1f); // Think time
-
-            // Simple AI: attack random player character
-            var aliveEnemies = enemyCharacters.Where(e => e.IsAlive).ToList();
+            Debug.Log($"[TurnManager] Enemy {currentCharacter.name} deciding action");
+            
             var alivePlayers = playerCharacters.Where(p => p.IsAlive).ToList();
 
             if (alivePlayers.Count > 0)
             {
                 var target = alivePlayers[Random.Range(0, alivePlayers.Count)];
+                Debug.Log($"[TurnManager] Enemy targeting {target.name}");
 
                 ChangeState(CombatState.EnemyAction);
-                yield return StartCoroutine(currentCharacter.Attack(target));
+                waitingForAction = true;
+                currentActionCoroutine = StartCoroutine(ExecuteActionCoroutine(currentCharacter.Attack(target)));
+            }
+            else
+            {
+                // No valid targets, end turn
+                EndCurrentTurn();
             }
         }
 
         /// <summary>
-        /// Processes status effects, regeneration, etc.
+        /// Process EnemyAction state - wait for action to complete
         /// </summary>
-        private IEnumerator ProcessEffects()
+        private void ProcessEnemyAction()
         {
-            // Process all active status effects
+            // Wait for action coroutine to complete
+            if (!waitingForAction)
+            {
+                EndCurrentTurn();
+            }
+        }
+
+        /// <summary>
+        /// Process effects and check win conditions
+        /// </summary>
+        private void ProcessEffectsState()
+        {
+            Debug.Log("[TurnManager] Processing effects");
+            
+            // Process status effects
             foreach (var character in turnOrder)
             {
                 if (character.IsAlive)
@@ -166,7 +200,77 @@ namespace TurnBasedCombat.Core
                 }
             }
 
-            yield return new WaitForSeconds(0.3f);
+            // Check win/lose conditions
+            if (CheckVictory())
+            {
+                Debug.Log("[TurnManager] Victory!");
+                ChangeState(CombatState.Victory);
+                OnBattleEnd?.Invoke();
+                return;
+            }
+            else if (CheckDefeat())
+            {
+                Debug.Log("[TurnManager] Defeat!");
+                ChangeState(CombatState.Defeat);
+                OnBattleEnd?.Invoke();
+                return;
+            }
+
+            // Move to next turn
+            stateTimer = turnDelay;
+            StartNextTurn();
+        }
+
+        /// <summary>
+        /// Start the next character's turn
+        /// </summary>
+        private void StartNextTurn()
+        {
+            // Get next character
+            currentCharacter = GetNextCharacter();
+            Debug.Log($"[TurnManager] Starting turn for {(currentCharacter != null ? currentCharacter.name : "NULL")}");
+
+            // Skip dead characters
+            while (currentCharacter != null && !currentCharacter.IsAlive)
+            {
+                Debug.Log($"[TurnManager] Skipping dead character {currentCharacter.name}");
+                AdvanceTurnIndex();
+                currentCharacter = GetNextCharacter();
+            }
+
+            if (currentCharacter == null)
+            {
+                Debug.LogError("[TurnManager] No valid character found!");
+                return;
+            }
+
+            // Invoke turn start event
+            OnTurnStart?.Invoke(currentCharacter);
+
+            // Determine if player or enemy turn
+            if (playerCharacters.Contains(currentCharacter))
+            {
+                Debug.Log($"[TurnManager] Player turn: {currentCharacter.name}");
+                ChangeState(CombatState.PlayerTurn);
+            }
+            else
+            {
+                Debug.Log($"[TurnManager] Enemy turn: {currentCharacter.name}");
+                ChangeState(CombatState.EnemyTurn);
+                stateTimer = enemyThinkTime;
+            }
+        }
+
+        /// <summary>
+        /// End the current character's turn
+        /// </summary>
+        private void EndCurrentTurn()
+        {
+            Debug.Log($"[TurnManager] Ending turn for {currentCharacter.name}");
+            OnTurnEnd?.Invoke(currentCharacter);
+
+            ChangeState(CombatState.Processing);
+            AdvanceTurnIndex();
         }
 
         /// <summary>
@@ -175,19 +279,32 @@ namespace TurnBasedCombat.Core
         public void ExecutePlayerAction(CombatCharacter target, System.Action<CombatCharacter> action)
         {
             if (currentState != CombatState.PlayerTurn)
+            {
+                Debug.LogWarning("[TurnManager] ExecutePlayerAction called but not in PlayerTurn state!");
                 return;
+            }
 
+            Debug.Log($"[TurnManager] Executing player action on {target.name}");
             ChangeState(CombatState.PlayerAction);
-            StartCoroutine(ExecuteActionRoutine(target, action));
+            
+            waitingForAction = true;
+            
+            // Execute action immediately (it's a callback, not a coroutine)
+            action?.Invoke(target);
+            
+            // For now, assume action completes immediately
+            // If actions become coroutines, we'd need to track them
+            waitingForAction = false;
         }
 
-        private IEnumerator ExecuteActionRoutine(CombatCharacter target, System.Action<CombatCharacter> action)
+        /// <summary>
+        /// Wrapper coroutine to track action completion
+        /// </summary>
+        private IEnumerator ExecuteActionCoroutine(IEnumerator actionCoroutine)
         {
-            action?.Invoke(target);
-            yield return new WaitForSeconds(0.5f);
-
-            // Move to next turn after action completes
-            NextTurn();
+            yield return StartCoroutine(actionCoroutine);
+            waitingForAction = false;
+            Debug.Log("[TurnManager] Action completed");
         }
 
         /// <summary>
@@ -202,25 +319,26 @@ namespace TurnBasedCombat.Core
             // Sort by speed (highest first)
             turnOrder = turnOrder.OrderByDescending(c => c.Speed).ToList();
 
+            Debug.Log($"[TurnManager] Turn order calculated: {string.Join(", ", turnOrder.Select(c => c.name))}");
+
             currentTurnIndex = 0;
         }
 
         /// <summary>
-        /// Gets the next character in turn order
+        /// Gets the current character in turn order
         /// </summary>
         private CombatCharacter GetNextCharacter()
         {
             if (turnOrder.Count == 0)
                 return null;
 
-            var character = turnOrder[currentTurnIndex];
-            return character;
+            return turnOrder[currentTurnIndex];
         }
 
         /// <summary>
-        /// Advances to next turn
+        /// Advances the turn index
         /// </summary>
-        private void NextTurn()
+        private void AdvanceTurnIndex()
         {
             currentTurnIndex++;
 
@@ -228,6 +346,7 @@ namespace TurnBasedCombat.Core
             if (currentTurnIndex >= turnOrder.Count)
             {
                 currentTurnIndex = 0;
+                Debug.Log("[TurnManager] Turn order looping back to start");
             }
         }
 
@@ -254,7 +373,7 @@ namespace TurnBasedCombat.Core
         {
             currentState = newState;
             OnStateChanged?.Invoke(currentState);
-            Debug.Log($"Combat State: {currentState}");
+            Debug.Log($"[TurnManager] Combat State: {currentState}");
         }
 
         /// <summary>
